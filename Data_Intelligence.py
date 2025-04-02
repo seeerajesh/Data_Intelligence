@@ -45,7 +45,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -64,15 +64,31 @@ tabs = st.tabs(["ODVT Trends", "Cost Model", "Transporter Discovery"])
 
 with tabs[0]:  # ODVT Trends
     st.subheader("ODVT Trends")
+    col1, col2 = st.columns(2)
+    
     if "Rate Type" in df_collective.columns and "Shipper" in df_collective.columns:
-        shipper_rate = df_collective.groupby("Rate Type")["Shipper"].sum()
-        fig1 = px.pie(shipper_rate, values="Shipper", names=shipper_rate.index, title="Shipper Rate Distribution")
-        st.plotly_chart(fig1)
-
+        shipper_rate = df_collective.groupby("Rate Type")["Shipper"].sum().reset_index()
+        fig1 = px.pie(shipper_rate, values="Shipper", names="Rate Type", title="Shipper Rate Distribution", hover_data=["Shipper"], hole=0.3)
+        col1.plotly_chart(fig1)
+    
     if "Category" in df_collective.columns:
-        vehicle_count = df_collective.groupby("Category").size()
-        fig2 = px.pie(vehicle_count, values=vehicle_count.values, names=vehicle_count.index, title="Vehicle Category Distribution")
-        st.plotly_chart(fig2)
+        vehicle_count = df_collective.groupby("Category").size().reset_index(name="Count")
+        fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution", hover_data=["Count"], hole=0.3)
+        col2.plotly_chart(fig2)
+
+    avg_table = df_collective.groupby(["Origin Locality", "Destination Locality"], as_index=False).agg(
+        Avg_Shipper_Rate=("Shipper", "mean"),
+        Avg_ETA=("ETA", "mean"),
+        Avg_Toll_Cost=("Toll Cost", "mean"),
+        Avg_Lead_Distance=("Lead Distance", "mean")
+    ).round(1)
+    st.dataframe(avg_table)
+    
+    top_states = ["Maharastra", "Gujarat", "Tamil Nadu", "Karnataka", "Uttar Pradesh"]
+    bubble_data = df_collective[df_collective["Origin State"].isin(top_states) & df_collective["Destination State"].isin(top_states)]
+    bubble_chart = bubble_data.groupby(["Origin State", "Destination State"]).size().reset_index(name="Count")
+    fig3 = px.scatter(bubble_chart, x="Origin State", y="Destination State", size="Count", hover_name="Count", title="Trips between Top States")
+    st.plotly_chart(fig3)
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
@@ -91,22 +107,13 @@ with tabs[2]:  # Transporter Discovery
     if "Rating" in df_collective.columns and "Transporter" in df_collective.columns:
         df_collective["Rating"] = pd.to_numeric(df_collective["Rating"], errors='coerce')
         df_collective["Shipper"] = pd.to_numeric(df_collective["Shipper"], errors='coerce')
+        
+        table_transporter = df_collective.groupby("Transporter", as_index=False).agg(
+            Mean_Rating=("Rating", "mean"),
+            Total_Trips=("Transporter", "count"),
+            Total_Shipper_Price=("Shipper", "sum")
+        ).round(1)
 
-        filtered_df = df_collective[
-            (df_collective["Rating"] >= transporter_rating[0]) &
-            (df_collective["Rating"] <= transporter_rating[1])
-        ]
-
-        if not filtered_df.empty:
-            table_transporter = filtered_df.groupby("Transporter", as_index=False).agg(
-                Mean_Rating=("Rating", "mean"),
-                Total_Trips=("Transporter", "count"),
-                Total_Shipper_Price=("Shipper", "sum")
-            )
-
-            table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Total Shipper Price"]
-            st.dataframe(table_transporter)
-        else:
-            st.warning("No matching transporters found for selected filters.")
+        st.dataframe(table_transporter)
     else:
         st.warning("Transporter data missing from dataset.")
