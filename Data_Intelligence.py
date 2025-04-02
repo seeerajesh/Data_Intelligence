@@ -9,6 +9,8 @@ def load_data():
         xls = pd.ExcelFile(excel_file)
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
+        df_collective.columns = ["Origin Pin code", "Origin Locality", "Origin cluster name", "Origin State", "Destination Pin code", "Destination cluster name", "Destination Locality", "Destination State", "Truck type", "Vehicle Type (New)", "Vehicle Class", "Toll Vehicle Category", "created_at", "Shipper", "Fleet owner Rate", "LSP Rate", "Lead Distance", "ETA", "Toll Cost", "Transporter", "Category", "Rating", "Rate type"]
+        df_cost_model.columns = ["Origin", "Destination", "Lead Distance (KM)", "TAT @300 KM/Day", "Fixed Cost/Day", "Variable Cost/KM", "Total (Fixed+Variable) Cost/Trip", "Transporter Margin - 5%", "Total Freight Cost/Trip", "Truck Type"]
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -19,7 +21,7 @@ df_collective, df_cost_model = load_data()
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception as e:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -62,10 +64,9 @@ with tabs[1]:  # Cost Model
     uploaded_file = st.file_uploader("Upload your cost model file", type=["xlsx"])
     if uploaded_file is not None:
         user_df = pd.read_excel(uploaded_file)
-        if set(["Origin city", "Destination City", "Vehicle Type"]).issubset(user_df.columns) and \
+        if set(["Origin", "Destination", "Truck Type"]).issubset(user_df.columns) and \
            set(["Origin", "Destination", "Truck Type"]).issubset(df_cost_model.columns):
-            merged_df = user_df.merge(df_cost_model, left_on=["Origin city", "Destination City", "Vehicle Type"],
-                                      right_on=["Origin", "Destination", "Truck Type"], how="left")
+            merged_df = user_df.merge(df_cost_model, on=["Origin", "Destination", "Truck Type"], how="left")
             st.dataframe(merged_df)
         else:
             st.warning("Missing required columns in uploaded file or cost model data.")
