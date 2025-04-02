@@ -24,7 +24,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception as e:
     st.warning("Logo image not found. Please check the file path.")
 
