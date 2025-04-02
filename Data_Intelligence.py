@@ -65,13 +65,13 @@ tabs = st.tabs(["ODVT Trends", "Cost Model", "Transporter Discovery"])
 with tabs[0]:  # ODVT Trends
     st.subheader("ODVT Trends")
     if "Rate Type" in df_collective.columns and "Shipper" in df_collective.columns:
-        shipper_rate = df_collective.groupby("Rate Type")["Shipper"].sum().reset_index()
-        fig1 = px.pie(shipper_rate, values="Shipper", names="Rate Type", title="Shipper Rate Distribution")
+        shipper_rate = df_collective.groupby("Rate Type")["Shipper"].sum()
+        fig1 = px.pie(shipper_rate, values="Shipper", names=shipper_rate.index, title="Shipper Rate Distribution")
         st.plotly_chart(fig1)
 
     if "Category" in df_collective.columns:
-        vehicle_count = df_collective.groupby("Category").size().reset_index(name="Count")
-        fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution")
+        vehicle_count = df_collective.groupby("Category").size()
+        fig2 = px.pie(vehicle_count, values=vehicle_count.values, names=vehicle_count.index, title="Vehicle Category Distribution")
         st.plotly_chart(fig2)
 
 with tabs[1]:  # Cost Model
@@ -97,7 +97,8 @@ with tabs[2]:  # Transporter Discovery
                 Mean_Rating=("Rating", "mean"),
                 Total_Trips=("Transporter", "count"),
                 Unique_Origin_Destination_Count=("Origin Locality", "nunique")
-            ).reset_index()
+            )
+            table_transporter.index.name = None  # Remove index name
             table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Unique Origin-Destination Count"]
             st.dataframe(table_transporter)
         else:
