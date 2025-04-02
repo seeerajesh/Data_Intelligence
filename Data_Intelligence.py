@@ -18,6 +18,9 @@ def load_data():
 
 df_collective, df_cost_model = load_data()
 
+# Convert necessary columns to numeric
+df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]].apply(pd.to_numeric, errors='coerce')
+
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
