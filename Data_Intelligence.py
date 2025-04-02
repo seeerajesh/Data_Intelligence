@@ -90,16 +90,21 @@ with tabs[2]:  # Transporter Discovery
     st.subheader("Transporter Discovery")
     if "Rating" in df_collective.columns and "Transporter" in df_collective.columns:
         df_collective["Rating"] = pd.to_numeric(df_collective["Rating"], errors='coerce')
-        filtered_df = df_collective[(df_collective["Rating"] >= transporter_rating[0]) &
-                                    (df_collective["Rating"] <= transporter_rating[1])]
+        df_collective["Shipper"] = pd.to_numeric(df_collective["Shipper"], errors='coerce')
+
+        filtered_df = df_collective[
+            (df_collective["Rating"] >= transporter_rating[0]) &
+            (df_collective["Rating"] <= transporter_rating[1])
+        ]
+
         if not filtered_df.empty:
             table_transporter = filtered_df.groupby("Transporter", as_index=False).agg(
                 Mean_Rating=("Rating", "mean"),
                 Total_Trips=("Transporter", "count"),
-                Unique_Origin_Destination_Count=("Origin Locality", "nunique")
-            ).reset_index(drop=True)
+                Total_Shipper_Price=("Shipper", "sum")
+            )
 
-            table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Unique Origin-Destination Count"]
+            table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Total Shipper Price"]
             st.dataframe(table_transporter)
         else:
             st.warning("No matching transporters found for selected filters.")
