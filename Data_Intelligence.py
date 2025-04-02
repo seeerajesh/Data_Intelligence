@@ -21,7 +21,7 @@ df_collective, df_cost_model = load_data()
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception as e:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -50,14 +50,17 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution")
         st.plotly_chart(fig2)
 
-    required_columns = {"Origin Locality", "Destination Locality", "Shipper", "ETA", "Toll Cost", "Lead Distance"}
-    if required_columns.issubset(df_collective.columns):
+    st.write("Available columns:", df_collective.columns.tolist())
+    expected_columns = ["Origin Locality", "Destination Locality", "Shipper", "ETA", "Toll Cost", "Lead Distance"]
+    missing_columns = [col for col in expected_columns if col not in df_collective.columns]
+    
+    if not missing_columns:
         table_data = df_collective.groupby(["Origin Locality", "Destination Locality"]).agg(
             {"Shipper": "mean", "ETA": "mean", "Toll Cost": "mean", "Lead Distance": "mean"}
         ).reset_index()
         st.dataframe(table_data)
     else:
-        st.warning(f"Missing columns for ODVT Trends table: {required_columns - set(df_collective.columns)}")
+        st.error(f"Missing columns for ODVT Trends table: {missing_columns}")
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
