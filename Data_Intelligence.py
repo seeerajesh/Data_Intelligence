@@ -53,14 +53,13 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution")
         st.plotly_chart(fig2)
 
-    st.write("Available columns:", df_collective.columns.tolist())
     expected_columns = ["Origin Locality", "Destination Locality", "Shipper", "ETA", "Toll Cost", "Lead Distance"]
     missing_columns = [col for col in expected_columns if col not in df_collective.columns]
     
     if not missing_columns:
-        table_data = df_collective.groupby(["Origin Locality", "Destination Locality"]).agg(
+        table_data = df_collective.groupby(["Origin Locality", "Destination Locality"], as_index=False).agg(
             {"Shipper": "mean", "ETA": "mean", "Toll Cost": "mean", "Lead Distance": "mean"}
-        ).reset_index()
+        )
         st.dataframe(table_data)
     else:
         st.error(f"Missing columns for ODVT Trends table: {missing_columns}")
