@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
 
 # Load Excel Data
 def load_data():
@@ -14,7 +15,13 @@ df_collective, df_cost_model = load_data()
 
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
-st.image("Logo.PNG", width=150)
+
+# Handle missing logo file
+if os.path.exists("Logo.png"):
+    st.image("Logo.png", width=150)
+else:
+    st.warning("Logo.png not found! Please upload it to the repository.")
+
 st.title("FT Data Intelligence")
 
 # Sidebar Filters
