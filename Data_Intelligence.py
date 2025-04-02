@@ -24,7 +24,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception as e:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -54,15 +54,13 @@ with tabs[0]:  # ODVT Trends
         st.plotly_chart(fig2)
 
     expected_columns = ["Origin Locality", "Destination Locality", "Shipper", "ETA", "Toll Cost", "Lead Distance"]
-    missing_columns = [col for col in expected_columns if col not in df_collective.columns]
-    
-    if not missing_columns:
+    if all(col in df_collective.columns for col in expected_columns):
         table_data = df_collective.groupby(["Origin Locality", "Destination Locality"], as_index=False).agg(
             {"Shipper": "mean", "ETA": "mean", "Toll Cost": "mean", "Lead Distance": "mean"}
         )
         st.dataframe(table_data)
     else:
-        st.error(f"Missing columns for ODVT Trends table: {missing_columns}")
+        st.error("Missing required columns for ODVT Trends table.")
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
@@ -83,24 +81,11 @@ with tabs[2]:  # Transporter Discovery
                                     (df_collective["Rating"] <= transporter_rating[1])]
         if not filtered_df.empty:
             table_transporter = filtered_df.groupby("Transporter").agg(
-                {"Rating": "mean", "Transporter": "count", "ETA": "mean", "Shipper": "mean"}
+                {"Rating": "mean", "Transporter": "count", "Origin Locality": "nunique"}
             ).reset_index()
-            table_transporter.columns = ["Transporter Name", "Transporter Rating", "Total Vehicles", "Average ETA", "Average Shipper Rate"]
+            table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Unique Origin-Destination Count"]
             st.dataframe(table_transporter)
         else:
             st.warning("No matching transporters found for selected filters.")
     else:
         st.warning("Transporter data missing from dataset.")
-
-    selected_origins = st.multiselect("Select Origin State", df_collective.get("Origin State", pd.Series()).unique())
-    selected_destinations = st.multiselect("Select Destination State", df_collective.get("Destination State", pd.Series()).unique())
-    if "Origin State" in df_collective.columns and "Destination State" in df_collective.columns and "Transporter" in df_collective.columns:
-        bubble_data = df_collective[df_collective["Origin State"].isin(selected_origins) & df_collective["Destination State"].isin(selected_destinations)]
-        if not bubble_data.empty:
-            bubble_chart = bubble_data.groupby(["Origin State", "Destination State", "Transporter"]).size().reset_index(name="Trip Count")
-            fig3 = px.scatter(bubble_chart, x="Origin State", y="Destination State", size="Trip Count", hover_name="Transporter", title="Transporter Activity")
-            st.plotly_chart(fig3)
-        else:
-            st.warning("No data available for selected origin-destination pairs.")
-    else:
-        st.warning("Missing required columns for transporter discovery visualization.")
