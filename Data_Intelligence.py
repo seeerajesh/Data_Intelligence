@@ -45,7 +45,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -93,12 +93,12 @@ with tabs[2]:  # Transporter Discovery
         filtered_df = df_collective[(df_collective["Rating"] >= transporter_rating[0]) &
                                     (df_collective["Rating"] <= transporter_rating[1])]
         if not filtered_df.empty:
-            table_transporter = filtered_df.groupby("Transporter").agg(
+            table_transporter = filtered_df.groupby("Transporter", as_index=False).agg(
                 Mean_Rating=("Rating", "mean"),
                 Total_Trips=("Transporter", "count"),
                 Unique_Origin_Destination_Count=("Origin Locality", "nunique")
-            )
-            table_transporter.index.name = None  # Remove index name
+            ).reset_index(drop=True)
+
             table_transporter.columns = ["Transporter Name", "Mean Rating", "Total Trips", "Unique Origin-Destination Count"]
             st.dataframe(table_transporter)
         else:
