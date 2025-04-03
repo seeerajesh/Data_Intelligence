@@ -6,6 +6,9 @@ import os
 import folium
 from streamlit_folium import folium_static
 
+# Set Streamlit Page Config (Must be first command)
+st.set_page_config(page_title="FT Data Intelligence", layout="wide")
+
 # Load Excel Data
 def load_data():
     excel_file = "ODVT.xlsx"
@@ -17,6 +20,12 @@ def load_data():
         xls = pd.ExcelFile(excel_file)
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
+        df_collective.columns = df_collective.columns.str.strip()  # Strip column names to avoid issues
+        
+        if "Origin Pin Code" not in df_collective.columns or "Destination Pin Code" not in df_collective.columns:
+            st.error(f"Columns found: {df_collective.columns.tolist()}")
+            return pd.DataFrame(), pd.DataFrame()
+        
         df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str)
         df_collective["Destination Pin Code"] = df_collective["Destination Pin Code"].astype(str)
         return df_collective, df_cost_model
@@ -32,10 +41,8 @@ for col in numeric_cols:
     if col in df_collective.columns:
         df_collective[col] = pd.to_numeric(df_collective[col], errors='coerce')
 
-# Streamlit UI
-st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
