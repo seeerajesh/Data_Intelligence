@@ -17,7 +17,7 @@ def load_data():
         xls = pd.ExcelFile(excel_file, engine='openpyxl')
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
-        df_collective.columns = df_collective.columns.str.strip()
+        df_collective.columns = df_collective.columns.str.strip()  # Strip column names to avoid issues
         df_cost_model.columns = df_cost_model.columns.str.strip()
         
         expected_columns = {"Rating", "Transporter", "Shipper"}
@@ -40,7 +40,7 @@ for col in numeric_cols:
         df_collective[col] = pd.to_numeric(df_collective[col], errors='coerce')
 
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -51,8 +51,6 @@ st.sidebar.header("Filters")
 date_range = st.sidebar.selectbox("Date Range", ["One Year", "6 Months", "3 Months", "One Month", "Month to Date"])
 transporter_name = st.sidebar.multiselect("Transporter Name", df_collective.get("Transporter", pd.Series(dtype=str)).unique())
 transporter_rating = st.sidebar.slider("Transporter Rating", 1, 5, (2, 5))
-origin_cluster = st.sidebar.multiselect("Origin Cluster", df_collective.get("Origin", pd.Series(dtype=str)).unique())
-destination_cluster = st.sidebar.multiselect("Destination Cluster", df_collective.get("Destination", pd.Series(dtype=str)).unique())
 
 # Tabs
 tabs = st.tabs(["ODVT Trends", "Cost Model", "Transporter Discovery"])
@@ -71,20 +69,14 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution", hover_data=["Count"], hole=0.3)
         col2.plotly_chart(fig2)
     
-    avg_table = df_collective.groupby(["Origin", "Destination"], as_index=False).agg(
-        Avg_Shipper_Rate=("Shipper", "mean"),
-        Avg_ETA=("ETA", "mean"),
-        Avg_Toll_Cost=("Toll Cost", "mean"),
-        Avg_Lead_Distance=("Lead Distance", "mean")
-    )
-    avg_table = avg_table.round(1)
-    st.dataframe(avg_table)
-    
-    top_states = ["Maharastra", "Gujarat", "Tamil Nadu", "Karnataka", "Uttar Pradesh"]
-    df_filtered = df_collective[df_collective["Origin State"].isin(top_states) & df_collective["Destination State"].isin(top_states)]
-    bubble_data = df_filtered.groupby(["Origin State", "Destination State"]).size().reset_index(name="Trip Count")
-    fig_bubble = px.scatter(bubble_data, x="Origin State", y="Destination State", size="Trip Count", hover_name="Trip Count", title="State-to-State Trip Count")
-    st.plotly_chart(fig_bubble)
+    if "Origin cluster name" in df_collective.columns and "Destination cluster name" in df_collective.columns:
+        avg_table = df_collective.groupby(["Origin cluster name", "Destination cluster name"], as_index=False).agg(
+            Avg_Shipper_Rate=("Shipper", "mean"),
+            Avg_ETA=("ETA", "mean"),
+            Avg_Toll_Cost=("Toll Cost", "mean"),
+            Avg_Lead_Distance=("Lead Distance", "mean")
+        )
+        st.dataframe(avg_table)
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model")
@@ -112,7 +104,6 @@ with tabs[2]:  # Transporter Discovery
             Total_Shipper_Rate=("Shipper", "sum"),
             Trip_Count=("Transporter", "count")
         ).reset_index()
-        transporter_summary = transporter_summary.round(1)
         st.dataframe(transporter_summary.sort_values(by="Mean_Rating", ascending=False))
     else:
         st.warning("Required columns for Transporter Discovery not found in dataset.")
