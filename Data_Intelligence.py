@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import os
 
 # Set Streamlit Page Config (Must be first command)
@@ -19,15 +18,14 @@ def load_data():
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
         df_collective.columns = df_collective.columns.str.strip()  # Strip column names to avoid issues
+        df_cost_model.columns = df_cost_model.columns.str.strip()
         
-        expected_columns = {"Origin Pin Code", "Destination Pin Code", "Rating", "Transporter", "Shipper"}
+        expected_columns = {"Rating", "Transporter", "Shipper"}
         missing_columns = expected_columns - set(df_collective.columns)
         if missing_columns:
             st.error(f"Missing columns in dataset: {missing_columns}")
             return pd.DataFrame(), pd.DataFrame()
         
-        df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str).str.zfill(6)
-        df_collective["Destination Pin Code"] = df_collective["Destination Pin Code"].astype(str).str.zfill(6)
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -51,8 +49,6 @@ st.title("FT Data Intelligence")
 # Sidebar Filters
 st.sidebar.header("Filters")
 date_range = st.sidebar.selectbox("Date Range", ["One Year", "6 Months", "3 Months", "One Month", "Month to Date"])
-origin_city = st.sidebar.multiselect("Origin City", df_collective.get("Origin State", pd.Series(dtype=str)).unique())
-destination_city = st.sidebar.multiselect("Destination City", df_collective.get("Destination State", pd.Series(dtype=str)).unique())
 transporter_name = st.sidebar.multiselect("Transporter Name", df_collective.get("Transporter", pd.Series(dtype=str)).unique())
 transporter_rating = st.sidebar.slider("Transporter Rating", 1, 5, (2, 5))
 
@@ -73,21 +69,23 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution", hover_data=["Count"], hole=0.3)
         col2.plotly_chart(fig2)
 
-    st.subheader("Top 10 Origin & Destination Pincodes by Trip Count")
+with tabs[1]:  # Cost Model
+    st.subheader("Cost Model")
+    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"])
     
-    if "Origin Pin Code" in df_collective.columns and "Destination Pin Code" in df_collective.columns:
-        origin_counts = df_collective["Origin Pin Code"].value_counts().reset_index()
-        origin_counts.columns = ["Origin Pin Code", "Trip Count"]
-        origin_counts = origin_counts.head(10)
-        
-        destination_counts = df_collective["Destination Pin Code"].value_counts().reset_index()
-        destination_counts.columns = ["Destination Pin Code", "Trip Count"]
-        destination_counts = destination_counts.head(10)
-        
-        st.dataframe(origin_counts)
-        st.dataframe(destination_counts)
-    else:
-        st.warning("Pincode columns not found in dataset. Please check the uploaded file.")
+    if uploaded_file is not None:
+        try:
+            df_user_data = pd.read_excel(uploaded_file, engine='openpyxl')
+            df_user_data.columns = df_user_data.columns.str.strip()
+            
+            required_columns = {"Origin", "Destination", "Truck Type"}
+            if not required_columns.issubset(df_user_data.columns):
+                st.error(f"Uploaded file must contain columns: {required_columns}")
+            else:
+                merged_df = pd.merge(df_user_data, df_cost_model, on=["Origin", "Destination", "Truck Type"], how="left")
+                st.dataframe(merged_df)
+        except Exception as e:
+            st.error(f"Error processing uploaded file: {e}")
 
 with tabs[2]:  # Transporter Discovery
     st.subheader("Transporter Discovery")
