@@ -17,18 +17,6 @@ def load_data():
         xls = pd.ExcelFile(excel_file)
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
-        df_collective = df_collective.rename(columns={
-            "Origin Pin code": "Origin Pin Code", "Origin Locality": "Origin Locality", 
-            "Origin cluster name": "Origin Cluster Name", "Origin State": "Origin State", 
-            "Destination Pin code": "Destination Pin Code", "Destination cluster name": "Destination Cluster Name", 
-            "Destination Locality": "Destination Locality", "Destination State": "Destination State", 
-            "Truck type": "Truck Type", "Vehicle Type (New)": "Vehicle Type", "Vehicle Class": "Vehicle Class", 
-            "Toll Vehicle Category": "Toll Vehicle Category", "created_at": "Created At", 
-            "Shipper": "Shipper", "Fleet owner Rate": "Fleet Owner Rate", "LSP Rate": "LSP Rate", 
-            "Lead Distance": "Lead Distance", "ETA": "ETA", "Toll Cost": "Toll Cost", 
-            "Transporter": "Transporter", "Category": "Category", "Rating": "Rating", "Rate type": "Rate Type",
-            "Latitude": "Latitude", "Longitude": "Longitude"
-        })
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -81,21 +69,24 @@ with tabs[0]:  # ODVT Trends
     ).round(1)
     st.dataframe(avg_table)
     
-    # OpenStreetMap Visualization with Error Handling
+    # OpenStreetMap Visualization using Pincodes
     st.subheader("Top 10 Origin & Destination Localities")
-    if "Latitude" in df_collective.columns and "Longitude" in df_collective.columns:
-        map_center = [20.5937, 78.9629]
+    if "Origin Pin Code" in df_collective.columns and "Destination Pin Code" in df_collective.columns:
+        top_origins = df_collective.groupby("Origin Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
+        top_destinations = df_collective.groupby("Destination Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
+        
+        map_center = [20.5937, 78.9629]  # Approximate center of India
         m = folium.Map(location=map_center, zoom_start=5)
 
-        for _, row in df_collective.dropna(subset=["Latitude", "Longitude"]).head(10).iterrows():
-            try:
-                folium.Marker([float(row["Latitude"]), float(row["Longitude"])], popup=row.get("Origin Locality", "Unknown")).add_to(m)
-            except Exception as e:
-                st.error(f"Error plotting location: {e}")
+        for _, row in top_origins.iterrows():
+            folium.Marker([row["Origin Pin Code"], row["Trip Count"]], popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='blue')).add_to(m)
+        
+        for _, row in top_destinations.iterrows():
+            folium.Marker([row["Destination Pin Code"], row["Trip Count"]], popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='red')).add_to(m)
         
         folium_static(m)
     else:
-        st.warning("Latitude and Longitude columns not found in dataset. Please check the uploaded file.")
+        st.warning("Pincode columns not found in dataset. Please check the uploaded file.")
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
