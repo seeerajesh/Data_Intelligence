@@ -6,6 +6,17 @@ import os
 import folium
 from streamlit_folium import folium_static
 
+# Load Pincode to Lat/Lon Mapping
+def load_pincode_mapping():
+    mapping_file = "pincode_latlon.csv"  # Ensure this file exists with columns: Pincode, Latitude, Longitude
+    if os.path.exists(mapping_file):
+        return pd.read_csv(mapping_file)
+    else:
+        st.error("Pincode to Lat/Lon mapping file not found.")
+        return pd.DataFrame()
+
+pincode_mapping = load_pincode_mapping()
+
 # Load Excel Data
 def load_data():
     excel_file = "ODVT.xlsx"
@@ -30,7 +41,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -75,14 +86,20 @@ with tabs[0]:  # ODVT Trends
         top_origins = df_collective.groupby("Origin Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
         top_destinations = df_collective.groupby("Destination Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
         
+        # Merge with latitude and longitude
+        top_origins = top_origins.merge(pincode_mapping, left_on="Origin Pin Code", right_on="Pincode", how="left")
+        top_destinations = top_destinations.merge(pincode_mapping, left_on="Destination Pin Code", right_on="Pincode", how="left")
+        
         map_center = [20.5937, 78.9629]  # Approximate center of India
         m = folium.Map(location=map_center, zoom_start=5)
 
         for _, row in top_origins.iterrows():
-            folium.Marker([row["Origin Pin Code"], row["Trip Count"]], popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='blue')).add_to(m)
+            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
+                folium.Marker([row["Latitude"], row["Longitude"]], popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='blue')).add_to(m)
         
         for _, row in top_destinations.iterrows():
-            folium.Marker([row["Destination Pin Code"], row["Trip Count"]], popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='red')).add_to(m)
+            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
+                folium.Marker([row["Latitude"], row["Longitude"]], popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='red')).add_to(m)
         
         folium_static(m)
     else:
