@@ -3,8 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import folium
-from streamlit_folium import folium_static
 
 # Set Streamlit Page Config (Must be first command)
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
@@ -44,7 +42,7 @@ for col in numeric_cols:
         df_collective[col] = pd.to_numeric(df_collective[col], errors='coerce')
 
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
