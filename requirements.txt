@@ -7,5 +7,4 @@ openpyxl
 NumPy
 folium
 streamlit_folium
-folium_static
 streamlit-folium
