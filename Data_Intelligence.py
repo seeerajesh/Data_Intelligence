@@ -22,14 +22,14 @@ def load_data():
         df_cost_model = xls.parse("Cost Model").dropna()
         df_collective.columns = df_collective.columns.str.strip()  # Strip column names to avoid issues
         
-        expected_columns = {"Origin Pin Code", "Destination Pin Code"}
+        expected_columns = {"Origin Pin Code", "Destination Pin Code", "Rating", "Transporter", "Shipper"}
         missing_columns = expected_columns - set(df_collective.columns)
         if missing_columns:
             st.error(f"Missing columns in dataset: {missing_columns}")
             return pd.DataFrame(), pd.DataFrame()
         
-        df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str)
-        df_collective["Destination Pin Code"] = df_collective["Destination Pin Code"].astype(str)
+        df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str).str.zfill(6)
+        df_collective["Destination Pin Code"] = df_collective["Destination Pin Code"].astype(str).str.zfill(6)
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -38,13 +38,13 @@ def load_data():
 df_collective, df_cost_model = load_data()
 
 # Convert necessary columns to numeric
-numeric_cols = ["ETA", "Toll Cost", "Lead Distance"]
+numeric_cols = ["ETA", "Toll Cost", "Lead Distance", "Rating", "Shipper"]
 for col in numeric_cols:
     if col in df_collective.columns:
         df_collective[col] = pd.to_numeric(df_collective[col], errors='coerce')
 
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -88,44 +88,17 @@ with tabs[0]:  # ODVT Trends
         
         st.dataframe(origin_counts)
         st.dataframe(destination_counts)
-        
-        # OpenStreetMap Visualization using Pincodes
-        map_center = [20.5937, 78.9629]  # Approximate center of India
-        m = folium.Map(location=map_center, zoom_start=5)
-
-        for _, row in origin_counts.iterrows():
-            folium.Marker(
-                location=[map_center[0] + (hash(row["Origin Pin Code"]) % 100) * 0.01, 
-                          map_center[1] + (hash(row["Origin Pin Code"]) % 100) * 0.01],
-                popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}",
-                icon=folium.Icon(color='green')
-            ).add_to(m)
-        
-        for _, row in destination_counts.iterrows():
-            folium.Marker(
-                location=[map_center[0] + (hash(row["Destination Pin Code"]) % 100) * 0.01, 
-                          map_center[1] + (hash(row["Destination Pin Code"]) % 100) * 0.01],
-                popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}",
-                icon=folium.Icon(color='red')
-            ).add_to(m)
-        
-        folium_static(m)
     else:
         st.warning("Pincode columns not found in dataset. Please check the uploaded file.")
 
-with tabs[1]:  # Cost Model
-    st.subheader("Cost Model Upload")
-    uploaded_file = st.file_uploader("Upload your cost model file", type=["xlsx"])
-    if uploaded_file is not None:
-        user_df = pd.read_excel(uploaded_file)
-        required_cols = {"Origin", "Destination", "Truck Type"}
-        if required_cols.issubset(user_df.columns) and required_cols.issubset(df_cost_model.columns):
-            merged_df = user_df.merge(df_cost_model, on=["Origin", "Destination", "Truck Type"], how="left")
-            st.dataframe(merged_df)
-        else:
-            st.warning("Missing required columns in uploaded file or cost model data.")
-
 with tabs[2]:  # Transporter Discovery
     st.subheader("Transporter Discovery")
-    filtered_df = df_collective[(df_collective["Rating"] >= transporter_rating[0]) & (df_collective["Rating"] <= transporter_rating[1])]
-    st.dataframe(filtered_df[["Transporter", "Rating", "Origin Pin Code", "Destination Pin Code", "Shipper"]].sort_values(by="Rating", ascending=False))
+    if "Transporter" in df_collective.columns and "Rating" in df_collective.columns and "Shipper" in df_collective.columns:
+        transporter_summary = df_collective.groupby("Transporter").agg(
+            Mean_Rating=("Rating", "mean"),
+            Total_Shipper_Rate=("Shipper", "sum"),
+            Trip_Count=("Transporter", "count")
+        ).reset_index()
+        st.dataframe(transporter_summary.sort_values(by="Mean_Rating", ascending=False))
+    else:
+        st.warning("Required columns for Transporter Discovery not found in dataset.")
