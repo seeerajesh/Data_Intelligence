@@ -17,13 +17,15 @@ def load_data():
         return pd.DataFrame(), pd.DataFrame()
     
     try:
-        xls = pd.ExcelFile(excel_file)
+        xls = pd.ExcelFile(excel_file, engine='openpyxl')
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
         df_collective.columns = df_collective.columns.str.strip()  # Strip column names to avoid issues
         
-        if "Origin Pin Code" not in df_collective.columns or "Destination Pin Code" not in df_collective.columns:
-            st.error(f"Columns found: {df_collective.columns.tolist()}")
+        expected_columns = {"Origin Pin Code", "Destination Pin Code"}
+        missing_columns = expected_columns - set(df_collective.columns)
+        if missing_columns:
+            st.error(f"Missing columns in dataset: {missing_columns}")
             return pd.DataFrame(), pd.DataFrame()
         
         df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str)
@@ -73,24 +75,38 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution", hover_data=["Count"], hole=0.3)
         col2.plotly_chart(fig2)
 
-    avg_table = df_collective.groupby(["Origin Pin Code", "Destination Pin Code"], as_index=False).agg(
-        Trip_Count=("Shipper", "count")
-    ).sort_values(by="Trip_Count", ascending=False).head(10)
-    st.dataframe(avg_table)
-    
-    # OpenStreetMap Visualization using Pincodes
-    st.subheader("Top 10 Origin & Destination Pincodes")
+    st.subheader("Top 10 Origin & Destination Pincodes by Trip Count")
     
     if "Origin Pin Code" in df_collective.columns and "Destination Pin Code" in df_collective.columns:
+        origin_counts = df_collective["Origin Pin Code"].value_counts().reset_index()
+        origin_counts.columns = ["Origin Pin Code", "Trip Count"]
+        origin_counts = origin_counts.head(10)
+        
+        destination_counts = df_collective["Destination Pin Code"].value_counts().reset_index()
+        destination_counts.columns = ["Destination Pin Code", "Trip Count"]
+        destination_counts = destination_counts.head(10)
+        
+        st.dataframe(origin_counts)
+        st.dataframe(destination_counts)
+        
+        # OpenStreetMap Visualization using Pincodes
         map_center = [20.5937, 78.9629]  # Approximate center of India
         m = folium.Map(location=map_center, zoom_start=5)
 
-        for _, row in avg_table.iterrows():
+        for _, row in origin_counts.iterrows():
             folium.Marker(
                 location=[map_center[0] + (hash(row["Origin Pin Code"]) % 100) * 0.01, 
+                          map_center[1] + (hash(row["Origin Pin Code"]) % 100) * 0.01],
+                popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}",
+                icon=folium.Icon(color='green')
+            ).add_to(m)
+        
+        for _, row in destination_counts.iterrows():
+            folium.Marker(
+                location=[map_center[0] + (hash(row["Destination Pin Code"]) % 100) * 0.01, 
                           map_center[1] + (hash(row["Destination Pin Code"]) % 100) * 0.01],
-                popup=f"Origin: {row['Origin Pin Code']} → Destination: {row['Destination Pin Code']} - Trips: {row['Trip_Count']}",
-                icon=folium.Icon(color='blue')
+                popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}",
+                icon=folium.Icon(color='red')
             ).add_to(m)
         
         folium_static(m)
