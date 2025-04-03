@@ -42,7 +42,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -89,7 +89,7 @@ with tabs[0]:  # ODVT Trends
 
         for _, row in df_collective.dropna(subset=["Latitude", "Longitude"]).head(10).iterrows():
             try:
-                folium.Marker([row["Latitude"], row["Longitude"]], popup=row.get("Origin Locality", "Unknown")).add_to(m)
+                folium.Marker([float(row["Latitude"]), float(row["Longitude"])], popup=row.get("Origin Locality", "Unknown")).add_to(m)
             except Exception as e:
                 st.error(f"Error plotting location: {e}")
         
