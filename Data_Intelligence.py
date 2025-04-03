@@ -80,28 +80,13 @@ with tabs[0]:  # ODVT Trends
     ).round(1)
     st.dataframe(avg_table)
     
-    top_states = ["Maharastra", "Gujarat", "Tamil Nadu", "Karnataka", "Uttar Pradesh"]
-    bubble_data = df_collective[df_collective["Origin State"].isin(top_states) & df_collective["Destination State"].isin(top_states)]
-    bubble_chart = bubble_data.groupby(["Origin State", "Destination State"]).size().reset_index(name="Count")
-    fig3 = px.scatter(bubble_chart, x="Origin State", y="Destination State", size="Count", hover_name="Count", title="Trips between Top States")
-    st.plotly_chart(fig3)
-    
-    # OpenStreetMap
+    # OpenStreetMap Visualization
     st.subheader("Top 10 Origin & Destination Localities")
-    
-    # Trend Chart
-    st.subheader("Month-on-Month Trip Trend")
-    df_collective["Created At"] = pd.to_datetime(df_collective["Created At"], errors='coerce')
-    df_collective = df_collective.dropna(subset=["Created At"])
-    
-    if not df_collective.empty:
-        trip_trend = df_collective.groupby(df_collective["Created At"].dt.to_period("M")).size().reset_index(name="Trip Count")
-        trip_trend["Created At"] = trip_trend["Created At"].astype(str)
-        
-        fig4 = px.line(trip_trend, x="Created At", y="Trip Count", title="Trips Month on Month", markers=True)
-        st.plotly_chart(fig4)
-    else:
-        st.warning("No valid trip data available for plotting.")
+    map_center = [20.5937, 78.9629]
+    m = folium.Map(location=map_center, zoom_start=5)
+    for _, row in df_collective.head(10).iterrows():
+        folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Origin Locality"]).add_to(m)
+    folium_static(m)
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
@@ -114,3 +99,8 @@ with tabs[1]:  # Cost Model
             st.dataframe(merged_df)
         else:
             st.warning("Missing required columns in uploaded file or cost model data.")
+
+with tabs[2]:  # Transporter Discovery
+    st.subheader("Transporter Discovery")
+    filtered_df = df_collective[(df_collective["Rating"] >= transporter_rating[0]) & (df_collective["Rating"] <= transporter_rating[1])]
+    st.dataframe(filtered_df[["Transporter", "Rating", "Origin Locality", "Destination Locality", "Shipper"]].sort_values(by="Rating", ascending=False))
