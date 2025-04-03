@@ -26,7 +26,8 @@ def load_data():
             "Toll Vehicle Category": "Toll Vehicle Category", "created_at": "Created At", 
             "Shipper": "Shipper", "Fleet owner Rate": "Fleet Owner Rate", "LSP Rate": "LSP Rate", 
             "Lead Distance": "Lead Distance", "ETA": "ETA", "Toll Cost": "Toll Cost", 
-            "Transporter": "Transporter", "Category": "Category", "Rating": "Rating", "Rate type": "Rate Type"
+            "Transporter": "Transporter", "Category": "Category", "Rating": "Rating", "Rate type": "Rate Type",
+            "Latitude": "Latitude", "Longitude": "Longitude"
         })
         return df_collective, df_cost_model
     except Exception as e:
@@ -41,7 +42,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -80,13 +81,21 @@ with tabs[0]:  # ODVT Trends
     ).round(1)
     st.dataframe(avg_table)
     
-    # OpenStreetMap Visualization
+    # OpenStreetMap Visualization with Error Handling
     st.subheader("Top 10 Origin & Destination Localities")
-    map_center = [20.5937, 78.9629]
-    m = folium.Map(location=map_center, zoom_start=5)
-    for _, row in df_collective.head(10).iterrows():
-        folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Origin Locality"]).add_to(m)
-    folium_static(m)
+    if "Latitude" in df_collective.columns and "Longitude" in df_collective.columns:
+        map_center = [20.5937, 78.9629]
+        m = folium.Map(location=map_center, zoom_start=5)
+
+        for _, row in df_collective.dropna(subset=["Latitude", "Longitude"]).head(10).iterrows():
+            try:
+                folium.Marker([row["Latitude"], row["Longitude"]], popup=row.get("Origin Locality", "Unknown")).add_to(m)
+            except Exception as e:
+                st.error(f"Error plotting location: {e}")
+        
+        folium_static(m)
+    else:
+        st.warning("Latitude and Longitude columns not found in dataset. Please check the uploaded file.")
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
