@@ -6,3 +6,5 @@ plotly
 openpyxl
 NumPy
 folium
+streamlit_folium
+folium_static
