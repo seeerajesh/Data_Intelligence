@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import os
+import folium
+from streamlit_folium import folium_static
 
 # Load Excel Data
 def load_data():
@@ -25,13 +28,6 @@ def load_data():
             "Lead Distance": "Lead Distance", "ETA": "ETA", "Toll Cost": "Toll Cost", 
             "Transporter": "Transporter", "Category": "Category", "Rating": "Rating", "Rate type": "Rate Type"
         })
-        df_cost_model = df_cost_model.rename(columns={
-            "Origin": "Origin", "Destination": "Destination", "Lead Distance (KM)": "Lead Distance (KM)", 
-            "TAT @300 KM/Day": "TAT @300 KM/Day", "Fixed Cost/Day": "Fixed Cost/Day", 
-            "Variable Cost/KM": "Variable Cost/KM", "Total (Fixed+Variable) Cost/Trip": "Total Cost/Trip", 
-            "Transporter Margin - 5%": "Transporter Margin - 5%", "Total Freight Cost/Trip": "Total Freight Cost/Trip", 
-            "Truck Type": "Truck Type"
-        })
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -45,7 +41,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.png", width=150)
+    st.image("Logo.PNG", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -89,6 +85,26 @@ with tabs[0]:  # ODVT Trends
     bubble_chart = bubble_data.groupby(["Origin State", "Destination State"]).size().reset_index(name="Count")
     fig3 = px.scatter(bubble_chart, x="Origin State", y="Destination State", size="Count", hover_name="Count", title="Trips between Top States")
     st.plotly_chart(fig3)
+    
+    # OpenStreetMap
+    st.subheader("Top 10 Origin & Destination Localities")
+    top_origins = df_collective["Origin Locality"].value_counts().head(10).index
+    top_destinations = df_collective["Destination Locality"].value_counts().head(10).index
+    m = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
+    for loc in top_origins:
+        folium.CircleMarker([df_collective[df_collective["Origin Locality"] == loc]["Origin Pin Code"].mean(), df_collective[df_collective["Origin Locality"] == loc]["Lead Distance"].mean()], 
+                            radius=10, color='blue', fill=True, fill_color='blue').add_to(m)
+    for loc in top_destinations:
+        folium.CircleMarker([df_collective[df_collective["Destination Locality"] == loc]["Destination Pin Code"].mean(), df_collective[df_collective["Destination Locality"] == loc]["Lead Distance"].mean()], 
+                            radius=10, color='orange', fill=True, fill_color='orange').add_to(m)
+    folium_static(m)
+    
+    # Trend Chart
+    st.subheader("Month-on-Month Trip Trend")
+    df_collective["Created At"] = pd.to_datetime(df_collective["Created At"], errors='coerce')
+    trip_trend = df_collective.groupby(df_collective["Created At"].dt.to_period("M")).size().reset_index(name="Trip Count")
+    fig4 = px.line(trip_trend, x="Created At", y="Trip Count", title="Trips Month on Month", markers=True)
+    st.plotly_chart(fig4)
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
@@ -101,19 +117,3 @@ with tabs[1]:  # Cost Model
             st.dataframe(merged_df)
         else:
             st.warning("Missing required columns in uploaded file or cost model data.")
-
-with tabs[2]:  # Transporter Discovery
-    st.subheader("Transporter Discovery")
-    if "Rating" in df_collective.columns and "Transporter" in df_collective.columns:
-        df_collective["Rating"] = pd.to_numeric(df_collective["Rating"], errors='coerce')
-        df_collective["Shipper"] = pd.to_numeric(df_collective["Shipper"], errors='coerce')
-        
-        table_transporter = df_collective.groupby("Transporter", as_index=False).agg(
-            Mean_Rating=("Rating", "mean"),
-            Total_Trips=("Transporter", "count"),
-            Total_Shipper_Price=("Shipper", "sum")
-        ).round(1)
-
-        st.dataframe(table_transporter)
-    else:
-        st.warning("Transporter data missing from dataset.")
