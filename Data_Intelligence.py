@@ -41,7 +41,7 @@ df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
 try:
-    st.image("Logo.PNG", width=150)
+    st.image("Logo.png", width=150)
 except Exception:
     st.warning("Logo image not found. Please check the file path.")
 
@@ -88,23 +88,20 @@ with tabs[0]:  # ODVT Trends
     
     # OpenStreetMap
     st.subheader("Top 10 Origin & Destination Localities")
-    top_origins = df_collective["Origin Locality"].value_counts().head(10).index
-    top_destinations = df_collective["Destination Locality"].value_counts().head(10).index
-    m = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
-    for loc in top_origins:
-        folium.CircleMarker([df_collective[df_collective["Origin Locality"] == loc]["Origin Pin Code"].mean(), df_collective[df_collective["Origin Locality"] == loc]["Lead Distance"].mean()], 
-                            radius=10, color='blue', fill=True, fill_color='blue').add_to(m)
-    for loc in top_destinations:
-        folium.CircleMarker([df_collective[df_collective["Destination Locality"] == loc]["Destination Pin Code"].mean(), df_collective[df_collective["Destination Locality"] == loc]["Lead Distance"].mean()], 
-                            radius=10, color='orange', fill=True, fill_color='orange').add_to(m)
-    folium_static(m)
     
     # Trend Chart
     st.subheader("Month-on-Month Trip Trend")
     df_collective["Created At"] = pd.to_datetime(df_collective["Created At"], errors='coerce')
-    trip_trend = df_collective.groupby(df_collective["Created At"].dt.to_period("M")).size().reset_index(name="Trip Count")
-    fig4 = px.line(trip_trend, x="Created At", y="Trip Count", title="Trips Month on Month", markers=True)
-    st.plotly_chart(fig4)
+    df_collective = df_collective.dropna(subset=["Created At"])
+    
+    if not df_collective.empty:
+        trip_trend = df_collective.groupby(df_collective["Created At"].dt.to_period("M")).size().reset_index(name="Trip Count")
+        trip_trend["Created At"] = trip_trend["Created At"].astype(str)
+        
+        fig4 = px.line(trip_trend, x="Created At", y="Trip Count", title="Trips Month on Month", markers=True)
+        st.plotly_chart(fig4)
+    else:
+        st.warning("No valid trip data available for plotting.")
 
 with tabs[1]:  # Cost Model
     st.subheader("Cost Model Upload")
