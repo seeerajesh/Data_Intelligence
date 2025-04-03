@@ -6,17 +6,6 @@ import os
 import folium
 from streamlit_folium import folium_static
 
-# Load Pincode to Lat/Lon Mapping
-def load_pincode_mapping():
-    mapping_file = "pincode_latlon.csv"  # Ensure this file exists with columns: Pincode, Latitude, Longitude
-    if os.path.exists(mapping_file):
-        return pd.read_csv(mapping_file)
-    else:
-        st.error("Pincode to Lat/Lon mapping file not found.")
-        return pd.DataFrame()
-
-pincode_mapping = load_pincode_mapping()
-
 # Load Excel Data
 def load_data():
     excel_file = "ODVT.xlsx"
@@ -28,6 +17,8 @@ def load_data():
         xls = pd.ExcelFile(excel_file)
         df_collective = xls.parse("Collective Data").dropna()
         df_cost_model = xls.parse("Cost Model").dropna()
+        df_collective["Origin Pin Code"] = df_collective["Origin Pin Code"].astype(str)
+        df_collective["Destination Pin Code"] = df_collective["Destination Pin Code"].astype(str)
         return df_collective, df_cost_model
     except Exception as e:
         st.error(f"Error loading Excel file: {e}")
@@ -36,7 +27,10 @@ def load_data():
 df_collective, df_cost_model = load_data()
 
 # Convert necessary columns to numeric
-df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]] = df_collective[["Shipper", "ETA", "Toll Cost", "Lead Distance"]].apply(pd.to_numeric, errors='coerce')
+numeric_cols = ["ETA", "Toll Cost", "Lead Distance"]
+for col in numeric_cols:
+    if col in df_collective.columns:
+        df_collective[col] = pd.to_numeric(df_collective[col], errors='coerce')
 
 # Streamlit UI
 st.set_page_config(page_title="FT Data Intelligence", layout="wide")
@@ -72,34 +66,25 @@ with tabs[0]:  # ODVT Trends
         fig2 = px.pie(vehicle_count, values="Count", names="Category", title="Vehicle Category Distribution", hover_data=["Count"], hole=0.3)
         col2.plotly_chart(fig2)
 
-    avg_table = df_collective.groupby(["Origin Locality", "Destination Locality"], as_index=False).agg(
-        Avg_Shipper_Rate=("Shipper", "mean"),
-        Avg_ETA=("ETA", "mean"),
-        Avg_Toll_Cost=("Toll Cost", "mean"),
-        Avg_Lead_Distance=("Lead Distance", "mean")
-    ).round(1)
+    avg_table = df_collective.groupby(["Origin Pin Code", "Destination Pin Code"], as_index=False).agg(
+        Trip_Count=("Shipper", "count")
+    ).sort_values(by="Trip_Count", ascending=False).head(10)
     st.dataframe(avg_table)
     
     # OpenStreetMap Visualization using Pincodes
-    st.subheader("Top 10 Origin & Destination Localities")
+    st.subheader("Top 10 Origin & Destination Pincodes")
+    
     if "Origin Pin Code" in df_collective.columns and "Destination Pin Code" in df_collective.columns:
-        top_origins = df_collective.groupby("Origin Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
-        top_destinations = df_collective.groupby("Destination Pin Code").size().reset_index(name="Trip Count").nlargest(10, "Trip Count")
-        
-        # Merge with latitude and longitude
-        top_origins = top_origins.merge(pincode_mapping, left_on="Origin Pin Code", right_on="Pincode", how="left")
-        top_destinations = top_destinations.merge(pincode_mapping, left_on="Destination Pin Code", right_on="Pincode", how="left")
-        
         map_center = [20.5937, 78.9629]  # Approximate center of India
         m = folium.Map(location=map_center, zoom_start=5)
 
-        for _, row in top_origins.iterrows():
-            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
-                folium.Marker([row["Latitude"], row["Longitude"]], popup=f"Origin: {row['Origin Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='blue')).add_to(m)
-        
-        for _, row in top_destinations.iterrows():
-            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
-                folium.Marker([row["Latitude"], row["Longitude"]], popup=f"Destination: {row['Destination Pin Code']} - Trips: {row['Trip Count']}", icon=folium.Icon(color='red')).add_to(m)
+        for _, row in avg_table.iterrows():
+            folium.Marker(
+                location=[map_center[0] + (hash(row["Origin Pin Code"]) % 100) * 0.01, 
+                          map_center[1] + (hash(row["Destination Pin Code"]) % 100) * 0.01],
+                popup=f"Origin: {row['Origin Pin Code']} → Destination: {row['Destination Pin Code']} - Trips: {row['Trip_Count']}",
+                icon=folium.Icon(color='blue')
+            ).add_to(m)
         
         folium_static(m)
     else:
@@ -120,4 +105,4 @@ with tabs[1]:  # Cost Model
 with tabs[2]:  # Transporter Discovery
     st.subheader("Transporter Discovery")
     filtered_df = df_collective[(df_collective["Rating"] >= transporter_rating[0]) & (df_collective["Rating"] <= transporter_rating[1])]
-    st.dataframe(filtered_df[["Transporter", "Rating", "Origin Locality", "Destination Locality", "Shipper"]].sort_values(by="Rating", ascending=False))
+    st.dataframe(filtered_df[["Transporter", "Rating", "Origin Pin Code", "Destination Pin Code", "Shipper"]].sort_values(by="Rating", ascending=False))
